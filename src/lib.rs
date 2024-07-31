@@ -1,86 +1,83 @@
-mod fs_helper {
-    use std::fs;
-    use std::io;
-    use std::path::{Path, PathBuf};
-    use std::sync::mpsc;
-    use std::thread;
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc;
+use std::thread;
 
-    /// ReadDir iterator reads the directory recursively.
-    /// First returns all files of current directory and then visit all subdirectories.
-    /// Implemented with threads now (yield operator not implemented yet)!
-    pub struct ReadDir {
-        root: PathBuf,
-        rx: Option<mpsc::Receiver<PathBuf>>,
+/// ReadDir iterator reads the directory recursively.
+/// First returns all files of current directory and then visit all subdirectories.
+/// Implemented with threads now (yield operator not implemented yet)!
+pub struct ReadDir {
+    root: PathBuf,
+    rx: Option<mpsc::Receiver<PathBuf>>,
+}
+
+impl ReadDir {
+    /// Attempts to create a new iterator.
+    ///
+    /// # Arguments:
+    ///
+    /// * `dir` - root directory.
+    pub fn try_new<P: AsRef<Path>>(dir: P) -> io::Result<ReadDir> {
+        Ok(ReadDir {
+            root: fs::canonicalize(dir)?,
+            rx: None,
+        })
     }
 
-    impl ReadDir {
-        /// Attempts to create a new iterator.
-        /// @param dir - root directory.
-        pub fn try_new<P: AsRef<Path>>(dir: P) -> io::Result<ReadDir> {
-            Ok(ReadDir {
-                root: fs::canonicalize(dir)?,
-                rx: None,
-            })
-        }
-
-        /// Returns a root directory.
-        pub fn root(&self) -> &Path {
-            &self.root
-        }
-
-        fn run(&mut self) {
-            let (tx, rx) = mpsc::channel();
-            self.rx = Some(rx);
-            let root = PathBuf::from(self.root());
-            thread::spawn(move || {
-                Self::visit(root, &tx).unwrap()
-            });
-        }
-
-        fn visit(dir: PathBuf, tx: &mpsc::Sender<PathBuf>) -> io::Result<()>
-        {
-            let mut sub_dirs: Vec<PathBuf> = Vec::new();
-            let entries = fs::read_dir(dir)?;
-            for entry in entries {
-                let path = entry?.path();
-                if path.is_dir() {
-                    sub_dirs.push(path)
-                } else {
-                    let err = format!("{}", path.display());
-                    if let Err(e) = tx.send(path) {
-                        println!("E_R_R_O_R_E: {}: {}", e, err);
-                    }
-                }
-            }
-            for sub_dir in sub_dirs {
-                Self::visit(sub_dir, tx)?;
-            }
-            Ok(())
-        }
+    /// Returns a root directory.
+    pub fn root(&self) -> &Path {
+        &self.root
     }
 
-    impl Iterator for ReadDir {
-        type Item = PathBuf;
+    fn run(&mut self) {
+        let (tx, rx) = mpsc::channel();
+        self.rx = Some(rx);
+        let root = PathBuf::from(self.root());
+        thread::spawn(move || Self::visit(root, &tx).unwrap());
+    }
 
-        /// Advances the iterator and returns the next value.
-        fn next(&mut self) -> Option<Self::Item> {
-            if self.rx.is_none() {
-                self.run();
-            }
-            if let Some(receiver) = &self.rx {
-                if let Ok(path) = receiver.recv() {
-                    return Some(path);
+    fn visit(dir: PathBuf, tx: &mpsc::Sender<PathBuf>) -> io::Result<()> {
+        let mut sub_dirs: Vec<PathBuf> = Vec::new();
+        let entries = fs::read_dir(dir)?;
+        for entry in entries {
+            let path = entry?.path();
+            if path.is_dir() {
+                sub_dirs.push(path)
+            } else {
+                let err = format!("{}", path.display());
+                if let Err(e) = tx.send(path) {
+                    println!("E_R_R_O_R_E: {}: {}", e, err);
                 }
             }
-            None
         }
+        for sub_dir in sub_dirs {
+            Self::visit(sub_dir, tx)?;
+        }
+        Ok(())
     }
 }
 
+impl Iterator for ReadDir {
+    type Item = PathBuf;
+
+    /// Advances the iterator and returns the next value.
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.rx.is_none() {
+            self.run();
+        }
+        if let Some(receiver) = &self.rx {
+            if let Ok(path) = receiver.recv() {
+                return Some(path);
+            }
+        }
+        None
+    }
+}
 
 #[cfg(test)]
 mod tests {
-    use crate::fs_helper::ReadDir;
+    use crate::ReadDir;
     use std::env;
 
     #[test]
@@ -128,7 +125,13 @@ mod tests {
             if !sub_dir.exists() {
                 fs::create_dir(&sub_dir).unwrap();
             }
-            for fname in ["file21.txt", "file22.txt", "file23.txt", "file24.txt", "file25.txt"] {
+            for fname in [
+                "file21.txt",
+                "file22.txt",
+                "file23.txt",
+                "file24.txt",
+                "file25.txt",
+            ] {
                 fs::File::create(format!("{}/{}", sub_dir.display(), fname)).unwrap();
             }
         }
