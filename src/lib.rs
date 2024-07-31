@@ -14,6 +14,8 @@ mod fs_helper {
     }
 
     impl ReadDir {
+        /// Attempts to create a new iterator.
+        /// @param dir - root directory.
         pub fn try_new<P: AsRef<Path>>(dir: P) -> io::Result<ReadDir> {
             Ok(ReadDir {
                 root: fs::canonicalize(dir)?,
@@ -21,6 +23,7 @@ mod fs_helper {
             })
         }
 
+        /// Returns a root directory.
         pub fn root(&self) -> &Path {
             &self.root
         }
@@ -58,6 +61,8 @@ mod fs_helper {
 
     impl Iterator for ReadDir {
         type Item = PathBuf;
+
+        /// Advances the iterator and returns the next value.
         fn next(&mut self) -> Option<Self::Item> {
             if self.rx.is_none() {
                 self.run();
