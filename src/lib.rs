@@ -1,8 +1,10 @@
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
+
+mod result;
+use crate::result::Result;
 
 /// ReadDir iterator reads the directory recursively.
 /// First returns all files of current directory and then visit all subdirectories.
@@ -18,7 +20,7 @@ impl ReadDir {
     /// # Arguments:
     ///
     /// * `dir` - root directory.
-    pub fn try_new<P: AsRef<Path>>(dir: P) -> io::Result<ReadDir> {
+    pub fn try_new<P: AsRef<Path>>(dir: P) -> Result<ReadDir> {
         Ok(ReadDir {
             root: fs::canonicalize(dir)?,
             rx: None,
@@ -37,7 +39,7 @@ impl ReadDir {
         thread::spawn(move || Self::visit(root, &tx).unwrap());
     }
 
-    fn visit(dir: PathBuf, tx: &mpsc::Sender<PathBuf>) -> io::Result<()> {
+    fn visit(dir: PathBuf, tx: &mpsc::Sender<PathBuf>) -> Result<()> {
         let mut sub_dirs: Vec<PathBuf> = Vec::new();
         let entries = fs::read_dir(dir)?;
         for entry in entries {
@@ -45,10 +47,7 @@ impl ReadDir {
             if path.is_dir() {
                 sub_dirs.push(path)
             } else {
-                let err = format!("{}", path.display());
-                if let Err(e) = tx.send(path) {
-                    println!("E_R_R_O_R_E: {}: {}", e, err);
-                }
+                tx.send(path)?;
             }
         }
         for sub_dir in sub_dirs {
