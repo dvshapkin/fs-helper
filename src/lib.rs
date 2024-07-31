@@ -5,15 +5,16 @@ mod fs_helper {
     use std::sync::mpsc;
     use std::thread;
 
-    /// Reads the directory recursively.
+    /// ReadDir iterator reads the directory recursively.
     /// First returns all files of current directory and then visit all subdirectories.
+    /// Implemented with threads now (yield operator not implemented yet)!
     pub struct ReadDir {
         root: PathBuf,
         rx: Option<mpsc::Receiver<PathBuf>>,
     }
 
     impl ReadDir {
-        pub fn new<P: AsRef<Path>>(dir: P) -> io::Result<ReadDir> {
+        pub fn try_new<P: AsRef<Path>>(dir: P) -> io::Result<ReadDir> {
             Ok(ReadDir {
                 root: fs::canonicalize(dir)?,
                 rx: None,
@@ -79,7 +80,7 @@ mod tests {
 
     #[test]
     fn read_dir_new() {
-        let rd = ReadDir::new(".").unwrap();
+        let rd = ReadDir::try_new(".").unwrap();
         assert_eq!(rd.root(), env::current_dir().unwrap());
     }
 
@@ -88,7 +89,7 @@ mod tests {
         let dir = "/tmp/fs-helper-test";
         utils::create_test_dir(dir);
 
-        let rd = ReadDir::new(dir).unwrap();
+        let rd = ReadDir::try_new(dir).unwrap();
         for path in rd {
             println!("{}", path.display());
         }
@@ -122,7 +123,7 @@ mod tests {
             if !sub_dir.exists() {
                 fs::create_dir(&sub_dir).unwrap();
             }
-            for fname in ["file21.txt", "file22.txt", "file23.txt"] {
+            for fname in ["file21.txt", "file22.txt", "file23.txt", "file24.txt", "file25.txt"] {
                 fs::File::create(format!("{}/{}", sub_dir.display(), fname)).unwrap();
             }
         }
