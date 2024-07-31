@@ -85,28 +85,51 @@ mod tests {
 
     #[test]
     fn read_dir_next() {
-        let rd = ReadDir::new(".").unwrap();
+        let dir = "/tmp/fs-helper-test";
+        utils::create_test_dir(dir);
+
+        let rd = ReadDir::new(dir).unwrap();
         for path in rd {
             println!("{}", path.display());
         }
+
+        utils::clean(dir);
     }
 
     mod utils {
+        use std::fmt::Debug;
         use std::fs;
-        use std::path::Path;
+        use std::path::{Path, PathBuf};
 
-        pub fn create_test_dir(dir: &Path) {
-            if !dir.exists() {
-                fs::create_dir(dir).unwrap();
+        pub fn create_test_dir<P: AsRef<Path> + Debug>(dir: P) {
+            // first level
+            if !dir.as_ref().exists() {
+                fs::create_dir(&dir).unwrap();
             }
-            for fname in ["file1.txt", "file2.txt", "file3.txt"] {
-                fs::File::create(format!("{}/{}", dir.to_str().unwrap(), fname)).unwrap();
+            for fname in ["file01.txt", "file02.txt", "file03.txt"] {
+                fs::File::create(format!("{}/{}", dir.as_ref().display(), fname)).unwrap();
+            }
+            // second level
+            let sub_dir = PathBuf::from(format!("{}/{}", dir.as_ref().display(), "subdir1"));
+            if !sub_dir.exists() {
+                fs::create_dir(&sub_dir).unwrap();
+            }
+            for fname in ["file11.txt", "file12.txt", "file13.txt"] {
+                fs::File::create(format!("{}/{}", sub_dir.display(), fname)).unwrap();
+            }
+            // third level
+            let sub_dir = PathBuf::from(format!("{}/{}", sub_dir.display(), "subdir2"));
+            if !sub_dir.exists() {
+                fs::create_dir(&sub_dir).unwrap();
+            }
+            for fname in ["file21.txt", "file22.txt", "file23.txt"] {
+                fs::File::create(format!("{}/{}", sub_dir.display(), fname)).unwrap();
             }
         }
 
-        pub fn clean(dir: &Path) {
-            if dir.exists() {
-                fs::remove_dir_all(dir).unwrap();
+        pub fn clean<P: AsRef<Path>>(dir: P) {
+            if dir.as_ref().exists() {
+                fs::remove_dir_all(&dir).unwrap();
             }
         }
     }
