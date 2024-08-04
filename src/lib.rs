@@ -36,10 +36,10 @@ impl ReadDir {
         let (tx, rx) = mpsc::channel();
         self.rx = Some(rx);
         let root = PathBuf::from(self.root());
-        thread::spawn(move || Self::visit(root, &tx).unwrap());
+        thread::spawn(|| Self::visit(root, tx).unwrap());
     }
 
-    fn visit(dir: PathBuf, tx: &mpsc::Sender<PathBuf>) -> Result<()> {
+    fn visit(dir: PathBuf, tx: mpsc::Sender<PathBuf>) -> Result<()> {
         let mut sub_dirs: Vec<PathBuf> = Vec::new();
         let entries = fs::read_dir(dir)?;
         for entry in entries {
@@ -51,7 +51,7 @@ impl ReadDir {
             }
         }
         for sub_dir in sub_dirs {
-            Self::visit(sub_dir, tx)?;
+            Self::visit(sub_dir, tx.clone())?;
         }
         Ok(())
     }
