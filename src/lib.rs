@@ -111,15 +111,29 @@ mod tests {
 
     #[test]
     fn read_dir_next() {
-        // let dir = "/tmp/fs-helper-test";
-        // utils::create_test_dir(dir);
+        let dir = "/tmp/fs-helper-test-1";
+        utils::create_test_dir(dir);
 
         let rd = ReadDir::try_new(".").unwrap();
         for path in rd {
             println!("{}", path.display());
         }
 
-        // utils::clean(dir);
+        utils::clean(dir);
+    }
+
+    #[test]
+    fn read_dir_next_multithreaded() {
+        let dir = "/tmp/fs-helper-test-2";
+        utils::create_test_dir(dir);
+
+        let mut rd = ReadDir::try_new(".").unwrap();
+        rd.is_multithreaded = true;
+        for path in rd {
+            println!("{}", path.display());
+        }
+
+        utils::clean(dir);
     }
 
     mod utils {
