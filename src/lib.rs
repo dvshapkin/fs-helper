@@ -12,6 +12,7 @@ use crate::result::Result;
 pub struct ReadDir {
     root: PathBuf,
     rx: Option<mpsc::Receiver<PathBuf>>,
+    pub is_multithreaded: bool
 }
 
 impl ReadDir {
@@ -24,6 +25,7 @@ impl ReadDir {
         Ok(ReadDir {
             root: fs::canonicalize(dir)?,
             rx: None,
+            is_multithreaded: false
         })
     }
 
@@ -32,11 +34,16 @@ impl ReadDir {
         &self.root
     }
 
+    /// Makes the iterator multithreaded.
     fn run(&mut self) {
         let (tx, rx) = mpsc::channel();
         self.rx = Some(rx);
         let root = PathBuf::from(self.root());
-        thread::spawn(|| Self::visit(root, tx).unwrap());
+        if self.is_multithreaded {
+            thread::spawn(|| Self::visit_multithreaded(root, tx).unwrap());
+        } else {
+            thread::spawn(|| Self::visit(root, tx).unwrap());
+        }
     }
 
     fn visit(dir: PathBuf, tx: mpsc::Sender<PathBuf>) -> Result<()> {
