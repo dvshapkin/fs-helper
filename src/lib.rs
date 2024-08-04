@@ -36,22 +36,25 @@ impl ReadDir {
         let (tx, rx) = mpsc::channel();
         self.rx = Some(rx);
         let root = PathBuf::from(self.root());
-        thread::spawn(move || Self::visit(root, &tx).unwrap());
+        thread::spawn(|| {
+            println!("New thread created!");
+            Self::visit_multithreaded(root, tx).unwrap()
+        });
     }
 
-    fn visit(dir: PathBuf, tx: &mpsc::Sender<PathBuf>) -> Result<()> {
-        let mut sub_dirs: Vec<PathBuf> = Vec::new();
+    fn visit_multithreaded(dir: PathBuf, tx: mpsc::Sender<PathBuf>) -> Result<()> {
         let entries = fs::read_dir(dir)?;
         for entry in entries {
             let path = entry?.path();
             if path.is_dir() {
-                sub_dirs.push(path)
+                let _tx = tx.clone();
+                thread::spawn(|| {
+                    println!("New thread created!");
+                    Self::visit_multithreaded(path, _tx).unwrap()
+                });
             } else {
                 tx.send(path)?;
             }
-        }
-        for sub_dir in sub_dirs {
-            Self::visit(sub_dir, tx)?;
         }
         Ok(())
     }
@@ -87,15 +90,15 @@ mod tests {
 
     #[test]
     fn read_dir_next() {
-        let dir = "/tmp/fs-helper-test";
-        utils::create_test_dir(dir);
+        // let dir = "/tmp/fs-helper-test";
+        // utils::create_test_dir(dir);
 
-        let rd = ReadDir::try_new(dir).unwrap();
+        let rd = ReadDir::try_new(".").unwrap();
         for path in rd {
             println!("{}", path.display());
         }
 
-        utils::clean(dir);
+        // utils::clean(dir);
     }
 
     mod utils {
