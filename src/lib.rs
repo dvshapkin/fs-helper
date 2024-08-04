@@ -55,6 +55,23 @@ impl ReadDir {
         }
         Ok(())
     }
+
+    fn visit_multithreaded(dir: PathBuf, tx: mpsc::Sender<PathBuf>) -> Result<()> {
+        let entries = fs::read_dir(dir)?;
+        for entry in entries {
+            let path = entry?.path();
+            if path.is_dir() {
+                let _tx = tx.clone();
+                thread::spawn(|| {
+                    println!("New thread created!");
+                    Self::visit_multithreaded(path, _tx).unwrap()
+                });
+            } else {
+                tx.send(path)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Iterator for ReadDir {
@@ -87,15 +104,15 @@ mod tests {
 
     #[test]
     fn read_dir_next() {
-        let dir = "/tmp/fs-helper-test";
-        utils::create_test_dir(dir);
+        // let dir = "/tmp/fs-helper-test";
+        // utils::create_test_dir(dir);
 
-        let rd = ReadDir::try_new(dir).unwrap();
+        let rd = ReadDir::try_new(".").unwrap();
         for path in rd {
             println!("{}", path.display());
         }
 
-        utils::clean(dir);
+        // utils::clean(dir);
     }
 
     mod utils {
